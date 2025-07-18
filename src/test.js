@@ -51,10 +51,10 @@ const config = {
   DRAG_RESISTANCE: 1.3, // Lower value = more responsive dragging
   TRANSITION_SPEED: 0.3, // Transition speed for card scaling
   ACTIVE_CARD_SCALE: 1.2, // Scale factor for active card
+  INACTIVE_CARD_SCALE: 0.8, // Scale factor for inactive cards
   SCALE_TRANSITION_DURATION: 0.6, // Duration for scale transitions
   SCALE_TRANSITION_EASE: "power2.inOut", // Easing for scale transitions
   PROXIMITY_THRESHOLD: 0.5, // How close to center before scaling starts (0-1)
-  MIN_SCALE: 1.0, // Minimum scale for cards
 };
 
 const state = {
@@ -147,6 +147,9 @@ const createProjectElement = (index) => {
   const titleElement = project.querySelector('.title');
   gsap.set(titleElement, { autoAlpha: 0, y: 20 });
   
+  // Set initial scale to inactive
+  gsap.set(project, { scale: config.INACTIVE_CARD_SCALE });
+  
   document.querySelector(".project-list").appendChild(project);
   state.projects.set(index, project);
   state.visibleProjects.add(index);
@@ -221,6 +224,13 @@ const updateCardPositions = () => {
         delay: 0.1,
         ease: "power2.out"
       });
+      
+      // Scale up the active card
+      gsap.to(activeProject, {
+        scale: config.ACTIVE_CARD_SCALE,
+        duration: 0.4,
+        ease: "power2.out"
+      });
     }
     
     // Hide title for the previous active card
@@ -234,6 +244,13 @@ const updateCardPositions = () => {
         duration: 0.3,
         ease: "power2.out"
       });
+      
+      // Scale down the previous active card
+      gsap.to(prevActiveProject, {
+        scale: config.INACTIVE_CARD_SCALE,
+        duration: 0.3,
+        ease: "power2.out"
+      });
     }
   }
   
@@ -244,28 +261,23 @@ const updateCardPositions = () => {
     // Convert currentX from pixels to vw
     const currentXInVw = state.currentX / (window.innerWidth / 100);
     
-    // Calculate proximity to center (0 = at center, 1 = one full card away)
-    const distanceFromCenter = Math.abs(exactCurrentPosition - index);
-    const normalizedDistance = Math.min(distanceFromCenter, 1) / config.PROXIMITY_THRESHOLD;
-    
-    // Calculate scale based on proximity to center
-    // When normalizedDistance is 0, scale is ACTIVE_CARD_SCALE
-    // When normalizedDistance is 1 or greater, scale is MIN_SCALE
-    let targetScale;
-    if (normalizedDistance >= 1) {
-      targetScale = config.MIN_SCALE;
-    } else {
-      targetScale = config.MIN_SCALE + (config.ACTIVE_CARD_SCALE - config.MIN_SCALE) * (1 - normalizedDistance);
-    }
-    
-    // Apply position and smooth scale transition
+    // Apply position
     gsap.to(project, {
       x: `${index * spacing + currentXInVw}vw`,
-      scale: targetScale,
       duration: 0.3,
       ease: "power2.out",
       overwrite: "auto"
     });
+    
+    // Only apply scale if it's not the active card (active card scale is handled separately)
+    if (index !== currentIndex) {
+      gsap.to(project, {
+        scale: config.INACTIVE_CARD_SCALE,
+        duration: 0.3,
+        ease: "power2.out",
+        overwrite: "auto"
+      });
+    }
   });
 };
 
@@ -368,11 +380,20 @@ const handleResize = () => {
   const spacing = state.isMobile ? config.CARD_SPACING_MOBILE : config.CARD_SPACING;
   state.projects.forEach((project, index) => {
     project.style.width = state.isMobile ? `${config.CARD_WIDTH_MOBILE}vw` : `${config.CARD_WIDTH}vw`;
-    gsap.set(project, { x: `${index * spacing}vw`, scale: 1 });
     
-    // Hide all titles initially
+    // Set initial scale based on whether it's the active card
+    const isActive = index === state.activeCardIndex;
+    gsap.set(project, { 
+      x: `${index * spacing}vw`, 
+      scale: isActive ? config.ACTIVE_CARD_SCALE : config.INACTIVE_CARD_SCALE 
+    });
+    
+    // Hide all titles initially except for active card
     const titleElement = project.querySelector('.title');
-    gsap.set(titleElement, { autoAlpha: 0, y: 20 });
+    gsap.set(titleElement, { 
+      autoAlpha: isActive ? 1 : 0, 
+      y: isActive ? 0 : 20 
+    });
     
     const parallaxImage = state.parallaxImages.get(index);
     if (parallaxImage) {
