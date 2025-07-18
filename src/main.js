@@ -53,7 +53,7 @@ const config = {
   ACTIVE_CARD_SCALE: 1.2, // Scale factor for active card
   SCALE_TRANSITION_DURATION: 0.6, // Duration for scale transitions
   SCALE_TRANSITION_EASE: "power2.inOut", // Easing for scale transitions
-  PROXIMITY_THRESHOLD: 0.5, // How close to center before scaling starts (0-1)
+  PROXIMITY_THRESHOLD: 1.5, // How close to center before scaling starts (increased from 0.5)
   MIN_SCALE: 1.0, // Minimum scale for cards
 };
 
@@ -75,6 +75,7 @@ const state = {
   visibleProjects: new Set(), // Track which projects are currently visible
   activeCardIndex: 0, // Track which card is currently in the middle
   previousActiveCardIndex: null, // Track previous active card for animations
+  lastDirection: null, // Track scroll direction
 };
 
 const createParallaxImage = (imageElement) => {
@@ -204,6 +205,13 @@ const updateCardPositions = () => {
   const currentIndex = getCurrentIndex();
   const exactCurrentPosition = -state.currentX / (window.innerWidth * (state.isMobile ? config.CARD_SPACING_MOBILE : config.CARD_SPACING) / 100);
   
+  // Determine scroll direction
+  const currentDirection = state.targetX > state.lastX ? 'right' : 'left';
+  if (currentDirection !== state.lastDirection) {
+    state.lastDirection = currentDirection;
+  }
+  state.lastX = state.targetX;
+  
   // Check if active card has changed
   if (state.activeCardIndex !== currentIndex) {
     state.previousActiveCardIndex = state.activeCardIndex;
@@ -235,6 +243,19 @@ const updateCardPositions = () => {
         ease: "power2.out"
       });
     }
+    
+    // Hide titles for all non-active cards to ensure they're hidden in both directions
+    state.projects.forEach((project, index) => {
+      if (index !== currentIndex) {
+        const titleElement = project.querySelector('.title');
+        gsap.to(titleElement, {
+          autoAlpha: 0,
+          y: 20,
+          duration: 0.3,
+          ease: "power2.out"
+        });
+      }
+    });
   }
   
   state.projects.forEach((project, index) => {
@@ -246,7 +267,7 @@ const updateCardPositions = () => {
     
     // Calculate proximity to center (0 = at center, 1 = one full card away)
     const distanceFromCenter = Math.abs(exactCurrentPosition - index);
-    const normalizedDistance = Math.min(distanceFromCenter, 1) / config.PROXIMITY_THRESHOLD;
+    const normalizedDistance = Math.min(distanceFromCenter, config.PROXIMITY_THRESHOLD) / config.PROXIMITY_THRESHOLD;
     
     // Calculate scale based on proximity to center
     // When normalizedDistance is 0, scale is ACTIVE_CARD_SCALE
@@ -260,10 +281,10 @@ const updateCardPositions = () => {
     
     // Apply position and smooth scale transition
     gsap.to(project, {
-      x: `${index * spacing + currentXInVw}vw`,
+      x: `${index * spacing + currentXInVw + 10}vw`,
       scale: targetScale,
       duration: 0.3,
-      ease: "power2.out",
+      ease: "power1.out",
       overwrite: "auto"
     });
   });
@@ -388,7 +409,6 @@ const initializeScroll = () => {
   window.addEventListener("mousemove", handleMouseMove);
   window.addEventListener("mouseup", handleMouseUp);
   window.addEventListener("mouseleave", handleMouseUp);
-  
   projectList.addEventListener("touchstart", handleTouchStart, { passive: false });
   projectList.addEventListener("touchmove", handleTouchMove, { passive: false });
   projectList.addEventListener("touchend", handleTouchEnd, { passive: false });
