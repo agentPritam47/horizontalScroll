@@ -7,13 +7,13 @@ const projectData = [
     isAlternate: false,
   },
   {
-    title: "Scratcher",
+    title: "Scratcher", 
     img: "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?q=80&w=765&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
     isAlternate: true,
   },
   {
     title: "Ember",
-    img: "https://images.unsplash.com/photo-1612204186347-fef88cc864db?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+    img: "https://images.unsplash.com/photo-1612204186347-fef88cc864db?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", 
     isAlternate: false,
   },
   {
@@ -49,6 +49,7 @@ const config = {
   CARD_WIDTH_MOBILE: 65, // vw width for mobile
   CARD_SPACING_MOBILE: 80, // vw spacing for mobile (reduced from 80)
   DRAG_RESISTANCE: 1.3, // Lower value = more responsive dragging
+  DRAG_RESISTANCE_MOBILE: 0.1, // Higher resistance for mobile to slow down dragging
   TRANSITION_SPEED: 0.3, // Transition speed for card scaling
   ACTIVE_CARD_SCALE: 1.2, // Scale factor for active card
   SCALE_TRANSITION_DURATION: 0.6, // Duration for scale transitions
@@ -213,11 +214,25 @@ const updateCardPositions = () => {
   state.lastX = state.targetX;
   
   // Check if active card has changed
-  if (state.activeCardIndex !== currentIndex) {
+  if (state.activeCardIndex !== currentIndex || state.isDragging) {
     state.previousActiveCardIndex = state.activeCardIndex;
     state.activeCardIndex = currentIndex;
     
-    // Show title for the active card
+    // Immediately hide all titles first
+    state.projects.forEach((project, index) => {
+      const titleElement = project.querySelector('.title');
+      if (index !== currentIndex) {
+        gsap.to(titleElement, {
+          autoAlpha: 0,
+          y: 20,
+          duration: 0.2,
+          ease: "power2.out",
+          overwrite: true
+        });
+      }
+    });
+    
+    // Then show title for the active card
     if (state.projects.has(currentIndex)) {
       const activeProject = state.projects.get(currentIndex);
       const titleElement = activeProject.querySelector('.title');
@@ -225,37 +240,11 @@ const updateCardPositions = () => {
       gsap.to(titleElement, {
         autoAlpha: 1,
         y: 0,
-        duration: 0.4,
-        delay: 0.1,
-        ease: "power2.out"
-      });
-    }
-    
-    // Hide title for the previous active card
-    if (state.previousActiveCardIndex !== null && state.projects.has(state.previousActiveCardIndex)) {
-      const prevActiveProject = state.projects.get(state.previousActiveCardIndex);
-      const prevTitleElement = prevActiveProject.querySelector('.title');
-      
-      gsap.to(prevTitleElement, {
-        autoAlpha: 0,
-        y: 20,
         duration: 0.3,
-        ease: "power2.out"
+        ease: "power2.out",
+        overwrite: true
       });
     }
-    
-    // Hide titles for all non-active cards to ensure they're hidden in both directions
-    state.projects.forEach((project, index) => {
-      if (index !== currentIndex) {
-        const titleElement = project.querySelector('.title');
-        gsap.to(titleElement, {
-          autoAlpha: 0,
-          y: 20,
-          duration: 0.3,
-          ease: "power2.out"
-        });
-      }
-    });
   }
   
   state.projects.forEach((project, index) => {
@@ -334,7 +323,8 @@ const handleTouchStart = (e) => {
 
 const handleTouchMove = (e) => {
   if (!state.isDragging || e.touches.length !== 1) return;
-  const deltaX = (e.touches[0].clientX - state.startX) * config.DRAG_RESISTANCE * 2;
+  const dragResistance = state.isMobile ? config.DRAG_RESISTANCE_MOBILE : config.DRAG_RESISTANCE;
+  const deltaX = (e.touches[0].clientX - state.startX) * dragResistance;
   state.currentX = state.lastX + deltaX;
   state.targetX = state.currentX;
   state.lastScrollTime = Date.now();
@@ -358,7 +348,8 @@ const handleMouseDown = (e) => {
 
 const handleMouseMove = (e) => {
   if (!state.isDragging) return;
-  const deltaX = (e.clientX - state.dragStartX) * config.DRAG_RESISTANCE;
+  const dragResistance = state.isMobile ? config.DRAG_RESISTANCE_MOBILE : config.DRAG_RESISTANCE;
+  const deltaX = (e.clientX - state.dragStartX) * dragResistance;
   state.currentX = state.dragLastX + deltaX;
   state.targetX = state.currentX;
   state.lastScrollTime = Date.now();
